@@ -1,0 +1,34 @@
+# ── Web framework ──────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.29.0          # ASGI server; [standard] includes websockets + httptools
+
+# ── Database ───────────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.36                 # ORM; v2.0.36+ required for Python 3.14 compatibility
+psycopg[binary]>=3.1               # Postgres driver; psycopg v3 has wheels for Python 3.14+
+                                   # Requires DATABASE_URL prefix: postgresql+psycopg://
+                                   # (psycopg2-binary has no Python 3.14 wheels)
+
+# ── File uploads / HTTP ────────────────────────────────────────────────────────
+python-multipart==0.0.9            # Required by FastAPI to parse multipart/form-data (file uploads)
+
+# ── Configuration ──────────────────────────────────────────────────────────────
+pydantic-settings==2.2.1           # BaseSettings: reads config from .env / environment variables
+python-dotenv==1.0.1               # Loads .env file into os.environ
+
+# ── Extractor dependencies ────────────────────────────────────────────────────
+boto3>=1.34.0                      # AWS Textract (TextractExtractor)
+botocore>=1.34.0                   # AWS base — required by boto3
+pytesseract>=0.3.10                # Tesseract OCR wrapper (OCRExtractor)
+pdf2image>=1.17.0                  # PDF → PIL images for pytesseract (OCRExtractor)
+Pillow>=10.0.0                     # PIL — required by pdf2image
+openai>=1.30.0                     # OpenAI GPT-4 (GPTExtractor)
+anthropic>=0.26.0                  # Anthropic Claude (ClaudeExtractor)
+pdfplumber>=0.11.0                 # PDF text extraction for LLM extractors
+python-docx>=1.1.0                 # DOCX text extraction for LLM/OCR extractors
+python-dateutil>=2.9.0             # Date normalization in post-processing (contract_date → YYYY-MM-DD)
+spacy>=3.7.0                       # NER for person_name/company_name (OCRExtractor)
+                                   # Post-install: python -m spacy download en_core_web_sm
+
+# ── Testing (Step 8 — smoke tests; installed now so the venv is ready) ─────────
+pytest==8.2.2
+httpx==0.27.0                      # Async test client for FastAPI (used by TestClient internally)
