@@ -1,0 +1,58 @@
+name: CI / CD — Doc Extractor
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ── Job 1: Lint + Test ─────────────────────────────────────────────────────────
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        # Tests mock the DB (see tests/conftest.py) — no real Postgres needed
+        env:
+          DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/testdb
+          LOG_LEVEL: WARNING
+        run: pytest tests/ -v --tb=short
+
+  # ── Job 2: Trigger Render deploy ───────────────────────────────────────────
+  # Render builds the Docker image itself from this repo on every deploy.
+  # The deploy hook URL is stored as a GitHub secret (never hardcoded here).
+  #
+  # To create the hook:
+  #   Render dashboard → doc-extractor service → Settings → Deploy Hook → Create
+  #   Add the URL as RENDER_DEPLOY_HOOK_URL in:
+  #   GitHub → repo Settings → Secrets and variables → Actions
+  deploy:
+    name: Deploy to Render
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+      url: https://doc-extractor.onrender.com
+
+    steps:
+      - name: Trigger Render deploy hook
+        run: |
+          curl -fsSL "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            -X POST \
+            -o /dev/null \
+            --fail-with-body
