@@ -1,0 +1,79 @@
+# render.yaml — Render Blueprint (Infrastructure as Code)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Usage:
+#   1. Push this file to your GitHub repo (already done).
+#   2. render.com → New → Blueprint → connect repo.
+#   3. Render auto-creates the web service + PostgreSQL database below.
+#   4. After creation:
+#      a) Copy the Internal Database URL from the "doc-extractor-db" service.
+#      b) Change prefix:  postgres://  →  postgresql+psycopg://
+#      c) Set it as DATABASE_URL in the web service's Environment tab.
+#      d) Run init.sql once via the web service Shell tab:
+#            psql "$DATABASE_URL" -f sql/init.sql
+
+services:
+  - type: web
+    name: doc-extractor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Free: 512 MB RAM, shared CPU, auto-spins-down after 15 min idle.
+    # Upgrade to "starter" ($7/mo) for always-on + persistent disk.
+    plan: free
+    healthCheckPath: /health
+
+    envVars:
+      # ── Database ────────────────────────────────────────────────────────────
+      # sync: false = value must be set manually in the Render dashboard.
+      # Copy Internal DB URL from doc-extractor-db, swap prefix to
+      # postgresql+psycopg:// — this is the ONLY manual step required.
+      - key: DATABASE_URL
+        sync: false
+
+      # ── File storage ────────────────────────────────────────────────────────
+      # /tmp is always writable — note: free tier disk is ephemeral (wiped on redeploy).
+      # Upgrade to Starter + add a Disk mount at /app/storage for persistence.
+      - key: STORAGE_DIR
+        value: /tmp/storage
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      # ── Extractor feature flags ──────────────────────────────────────────────
+      # Toggle these to true in the Render dashboard (+ add the matching API key).
+      - key: OCR_ENABLED
+        value: "false"
+      - key: GPT_ENABLED
+        value: "false"
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: CLAUDE_ENABLED
+        value: "false"
+      - key: CLAUDE_MODEL
+        value: claude-3-5-sonnet-20241022
+      - key: NVIDIA_ENABLED
+        value: "false"
+      - key: NVIDIA_MODEL
+        value: abacusai/dracarys-llama-3.1-70b-instruct
+      - key: TEXTRACT_ENABLED
+        value: "false"
+      - key: AWS_REGION
+        value: us-east-1
+
+      # ── API keys — set in dashboard, never committed ─────────────────────────
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+databases:
+  - name: doc-extractor-db
+    plan: free        # 90-day free PostgreSQL, 1 GB storage, internal access only
+    ipAllowList: []   # Render services on the same account can connect internally
