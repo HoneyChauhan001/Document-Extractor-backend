@@ -19,7 +19,7 @@ RUN WITH:
 
 ENVIRONMENT:
     Copy .env.example to .env, then set DATABASE_URL to your Postgres DSN.
-    Run `psql $DATABASE_URL -f sql/init.sql` to create tables before starting.
+    Tables are created automatically at startup via sql/init.sql (idempotent).
 """
 
 from contextlib import asynccontextmanager
@@ -27,12 +27,31 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.db.session import engine
 
 logger = get_logger(__name__)
+
+# Resolved relative to this file — works in local dev, Docker, and Render.
+_INIT_SQL_PATH = Path(__file__).parent.parent / "sql" / "init.sql"
+
+
+def _apply_schema() -> None:
+    """
+    Run sql/init.sql against the database at startup.
+
+    Every statement uses CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS
+    so this is fully idempotent — safe to execute on every boot.
+    Removes the need for a manual psql step on any deployment platform.
+    """
+    sql = _INIT_SQL_PATH.read_text()
+    with engine.begin() as conn:
+        conn.execute(text(sql))
+    logger.info("Database schema applied (init.sql)")
 
 
 @asynccontextmanager
@@ -45,6 +64,9 @@ async def lifespan(app: FastAPI):
     current FastAPI best practice.
     """
     # ── Startup ────────────────────────────────────────────────────────────────
+    # Apply DB schema (idempotent — safe on every boot).
+    _apply_schema()
+
     # Ensure the root storage directory exists.
     # Uploaded files go into: STORAGE_DIR/<job_id>/<filename>
     storage_path = Path(settings.STORAGE_DIR)
